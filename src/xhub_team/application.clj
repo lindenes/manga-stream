@@ -1,7 +1,6 @@
 (ns xhub-team.application
   (:require [clojure.tools.logging :as log]
-            [ring.middleware.multipart-params :refer [wrap-multipart-params]]
-            [ring.middleware.params :refer [wrap-params]]
+             [xhub-team.errors :as err]
             [xhub-team.domain :as domain])
   (:use xhub-team.logger))
 
@@ -29,7 +28,7 @@
        :headers {"Access-Control-Allow-Origin" "*"
                  "Access-Control-Allow-Methods" "*"
                  "Access-Control-Allow-Headers" "*"}}
-     (let [response ((wrap-multipart-params (wrap-params (wrap-rest-error handler))) req)]
+     (let [response (handler req)]
         (-> response
             (assoc-in [:headers "Access-Control-Allow-Origin"] "*")
             (assoc-in [:headers "Access-Control-Allow-Methods"] "GET, POST, PUT, DELETE, OPTIONS")
@@ -40,9 +39,6 @@
     (number? (Integer/parseInt x))
     (catch Exception _ false)
     ))
-
-(def validate-error
-  {:error-code 1 :error-message "Не верный формат запроса"})
 
 (defn handler [req]
   (log/info "Request:" (:uri req) (:request-method req) )
@@ -55,15 +51,17 @@
       (let [params (:query-params req)
             oid (try
                   (Integer/parseInt (get params "oid"))
-                  (catch Exception e (throw (ex-info (.getMessage e) validate-error ))))]
+                  (catch Exception e (throw (ex-info (.getMessage e) err/validate-error ))))]
         {:status 200 :body (domain/get-manga-page oid)}
         )
 
       (and (= method :post) (= uri "/manga"))
       (let [params (:multipart-params req)
-            filtered-map (filter is-int (keys params))]
+            filtered-map (filter is-int (keys params))
+            uuid (try (java.util.UUID/fromString (get params "id"))
+                 (catch Exception e (throw (ex-info (.getMessage e) err/validate-error ))))]
         (doseq [elem filtered-map]
-          (domain/add-manga-page (:tempfile (get params elem)) (get params "id")))
+          (domain/add-manga-page (:tempfile (get params elem)) uuid))
         {:status 200 :body "OK"})
 
       :else
