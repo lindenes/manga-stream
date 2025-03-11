@@ -2,7 +2,8 @@
   (:require [clojure.tools.logging :as log]
              [xhub-team.errors :as err]
             [xhub-team.domain :as domain])
-  (:use xhub-team.logger))
+  (:use xhub-team.logger)
+  (:import (java.io File FileInputStream)))
 
 (defn error->respone [error]
   (log/error error)
@@ -42,6 +43,7 @@
 
 (defn handler [req]
   (log/info "Request:" (:uri req) (:request-method req) )
+  (log/info (:multipart-params req))
   (let [uri (:uri req)
         method (:request-method req)
         body (:body req)]
@@ -50,10 +52,10 @@
       (and (= method :get) (= uri "/manga"))
       (let [params (:query-params req)
             oid (try
-                  (Integer/parseInt (get params "oid"))
-                  (catch Exception e (throw (ex-info (.getMessage e) err/validate-error ))))]
-        {:status 200 :body (domain/get-manga-page oid)}
-        )
+                  (Integer/parseInt (get params "id"))
+                  (catch Exception e (throw (ex-info (.getMessage e) err/validate-error ))))
+            file (domain/get-manga-page oid)]
+        {:status 200 :body file})
 
       (and (= method :post) (= uri "/manga"))
       (let [params (:multipart-params req)

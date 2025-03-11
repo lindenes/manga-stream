@@ -31,14 +31,17 @@
           oid (.createLO lob-manager)]
       (with-open [lob (.open lob-manager oid LargeObjectManager/WRITE)
                   input-stream (FileInputStream. file)]
-        (io/copy input-stream (.getOutputStream lob) :buffer-size 65536)
+        (io/copy input-stream (.getOutputStream lob) :buffer-size 262144)
         (sql/insert! tx :manga_page {:oid oid :manga_id manga-id} )))))
+
 
 (defn read-large-object [oid]
   (jdbc/with-transaction [tx datasource]
     (let [conn (.unwrap tx PGConnection)
-          lob-manager (.getLargeObjectAPI conn)]
+          lob-manager (.getLargeObjectAPI conn)
+          temp-dir (System/getProperty "java.io.tmpdir")
+          temp-file (File/createTempFile (str "large-object-" oid) ".tmp" (File. temp-dir))]
       (with-open [ lob (.open lob-manager oid LargeObjectManager/READ)
-                  output-stream (ByteArrayOutputStream.)]
-        (io/copy (.getInputStream lob) output-stream :buffer-size 65535)
-        (.toByteArray output-stream)))))
+                 output-stream (io/output-stream temp-file)]
+       (io/copy (.getInputStream lob) output-stream :buffer-size 262144))
+        temp-file)))
