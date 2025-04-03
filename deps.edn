@@ -13,7 +13,9 @@
         ring/ring-core {:mvn/version "1.12.0"}
         com.zaxxer/HikariCP {:mvn/version "6.2.1"}
         com.taoensso/carmine {:mvn/version "3.4.1"}
-        amazonica/amazonica {:mvn/version "0.3.168"}}
+        amazonica/amazonica {:mvn/version "0.3.168"}
+        org.clojure/data.json {:mvn/version "2.5.1"}
+        javax.xml.bind/jaxb-api {:mvn/version "2.3.1"}}
  :aliases
  {:run-m {:main-opts ["-m" "xhub-team.manga-stream"]}
   :run-x {:ns-default xhub-team.manga-stream

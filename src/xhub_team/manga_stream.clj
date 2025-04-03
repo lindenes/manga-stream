@@ -20,6 +20,7 @@
                             wrap-params
                             wrap-cors
                             wrap-rest-error)
-                        (conf/config :application)))
+                        (conf/config :application))
+  (println "server started witg port" (conf/config :application)))
 
 (my-server)
