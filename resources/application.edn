@@ -2,4 +2,8 @@
             :user #env MANGA_STREAM_DATABASE_USER
             :password #env MANGA_STREAM_DATABASE_PASSWORD}
 
- :application {:port #env MANGA_STREAM_SERVER_PORT}}
+ :application {:port #env MANGA_STREAM_SERVER_PORT}
+
+ :s3  {:access-key #env MANGA_STREAM_S3_ACCESS_KEY
+       :secret-key #env MANGA_STREAM_S3_SECRET_KEY
+       :endpoint   #env MANGA_STREAM_S3_ENDPOINT}}

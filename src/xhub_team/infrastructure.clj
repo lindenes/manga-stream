@@ -2,7 +2,9 @@
   (:require [next.jdbc :as jdbc]
             [next.jdbc.sql :as sql]
             [clojure.java.io :as io]
-            [xhub-team.configuration :as conf])
+            [xhub-team.configuration :as conf]
+            [amazonica.aws.s3 :as s3]
+            [xhub-team.errors :as err])
   (:import [com.zaxxer.hikari HikariDataSource HikariConfig]
            (org.postgresql.largeobject LargeObjectManager)
            (java.io File FileInputStream)
@@ -23,25 +25,19 @@
 
     (HikariDataSource. config)))
 
-(defn save-large-object-from-file [file manga-id]
-  (jdbc/with-transaction [tx datasource]
-    (let [conn (.unwrap tx PGConnection)
-          _ (.setAutoCommit conn false)
-          lob-manager (.getLargeObjectAPI conn)
-          oid (.createLO lob-manager)]
-      (with-open [lob (.open lob-manager oid LargeObjectManager/WRITE)
-                  input-stream (FileInputStream. file)]
-        (io/copy input-stream (.getOutputStream lob) :buffer-size 262144)
-        (sql/insert! tx :manga_page {:oid oid :manga_id manga-id} )))))
+(defn save-photo [file manga-id]
+  (let [photo-id (java.util.UUID/randomUUID)]
+     (try
+       (s3/put-object conf/aws-creds
+               :bucket-name "hentai-page-bucket"
+               :key (str manga-id ":" photo-id)
+               :file file )
+    (jdbc/with-transaction [tx datasource]
+      (sql/insert! tx :manga_page {:id photo-id :manga_id manga-id}))
+    (catch Exception e (throw (ex-info (.getMessage e) err/photo-load-error))))))
 
-
-(defn read-large-object [oid]
-  (jdbc/with-transaction [tx datasource]
-    (let [conn (.unwrap tx PGConnection)
-          lob-manager (.getLargeObjectAPI conn)
-          temp-dir (System/getProperty "java.io.tmpdir")
-          temp-file (File/createTempFile (str "large-object-" oid) ".tmp" (File. temp-dir))]
-      (with-open [ lob (.open lob-manager oid LargeObjectManager/READ)
-                 output-stream (io/output-stream temp-file)]
-       (io/copy (.getInputStream lob) output-stream :buffer-size 262144))
-        temp-file)))
+(defn read-photo [manga-id photo-id]
+  (let [s3-photo  (s3/get-object conf/aws-creds
+                                 :bucket-name "hentai-page-bucket"
+                                 :key (str manga-id ":" photo-id))]
+     (:object-content s3-photo)))

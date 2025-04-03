@@ -3,7 +3,7 @@
              [clojure.java.io :as io]))
 
 (defn add-manga-page [^java.io.File page ^String manga-id]
-  (infra/save-large-object-from-file page manga-id))
+  (infra/save-photo page (java.util.UUID/fromString manga-id)))
 
-(defn get-manga-page [^Integer oid]
-  (infra/read-large-object oid))
+(defn get-manga-page [manga-id page-id]
+  (infra/read-photo manga-id page-id))

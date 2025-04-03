@@ -1,26 +1,32 @@
 (ns xhub-team.application
   (:require [clojure.tools.logging :as log]
              [xhub-team.errors :as err]
+              [clojure.data.json :as json]
             [xhub-team.domain :as domain])
   (:use xhub-team.logger)
   (:import (java.io File FileInputStream)))
 
-(defn error->respone [error]
-  (log/error error)
+(defn error->response [error]
   (let [data (ex-data error)
-        msg  (:error-message data)
-        code (:error-code data)]
-    (condp = code
-      1
-      {:status 400 :body msg}
+        error-data (:error-data data)]
+    (log/error data)
+    (let [error-map  (condp = (:error_code (first error-data))
+                        1
+                        {:status 400 :body error-data }
 
-      {:status 500 :body "Unexpected server error"})))
+                        2
+                        {:status 503 :body error-data}
+
+                        {:status 500 :body "Unexpected server error"}) ]
+         (-> error-map
+             (assoc :body (json/write-str (:body error-map)))
+             (assoc-in [:headers "Content-Type"] "application/json")))))
 
 (defn wrap-rest-error [handler]
   (fn [req]
     (try
       (handler req)
-      (catch Exception e (error->respone e)))))
+      (catch Exception e (error->response e)))))
 
 (defn wrap-cors [handler]
   (fn [req]
@@ -48,13 +54,11 @@
         method (:request-method req)
         body (:body req)]
     (cond
-
       (and (= method :get) (= uri "/manga"))
       (let [params (:query-params req)
-            oid (try
-                  (Integer/parseInt (get params "id"))
-                  (catch Exception e (throw (ex-info (.getMessage e) err/validate-error ))))
-            file (domain/get-manga-page oid)]
+            manga-id (get params "manga_id")
+            page-id (get params "page_id")
+            file (domain/get-manga-page manga-id page-id)]
         {:status 200 :body file})
 
       (and (= method :post) (= uri "/manga"))
