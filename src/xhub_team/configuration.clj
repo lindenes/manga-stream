@@ -7,3 +7,5 @@
    (io/resource "application.edn")))
 
 (def aws-creds (:s3 config))
+
+(def config->redis (:redis config))

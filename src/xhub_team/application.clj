@@ -2,7 +2,7 @@
   (:require [clojure.tools.logging :as log]
              [xhub-team.errors :as err]
               [clojure.data.json :as json]
-            [xhub-team.domain :as domain])
+            [xhub-team.infrastructure :as infra])
   (:use xhub-team.logger)
   (:import (java.io File FileInputStream)))
 
@@ -16,6 +16,15 @@
 
                         2
                         {:status 503 :body error-data}
+
+                        3
+                        {:status 404 :body error-data}
+
+                        4
+                        {:status 401 :body error-data}
+
+                        5
+                        {:status 403 :body error-data}
 
                         {:status 500 :body "Unexpected server error"}) ]
          (-> error-map
@@ -44,13 +53,13 @@
 (defn is-int [x]
   (try
     (number? (Integer/parseInt x))
-    (catch Exception _ false)
-    ))
+    (catch Exception _ false)))
 
 (defn handler [req]
   (log/info "Request:" (:uri req) (:request-method req) )
   (log/info (:multipart-params req))
   (let [uri (:uri req)
+        token (-> req :headers (get "token"))
         method (:request-method req)
         body (:body req)]
     (cond
@@ -58,16 +67,29 @@
       (let [params (:query-params req)
             manga-id (get params "manga_id")
             page-id (get params "page_id")
-            file (domain/get-manga-page manga-id page-id)]
+            file (infra/read-photo manga-id page-id)]
         {:status 200 :body file})
 
       (and (= method :post) (= uri "/manga"))
-      (let [params (:multipart-params req)
+      (let [have-privileges (infa/check-privileges token)
+            params (:multipart-params req)
             filtered-map (filter is-int (keys params))
             uuid (try (java.util.UUID/fromString (get params "id"))
                  (catch Exception e (throw (ex-info (.getMessage e) err/validate-error ))))]
+        (when (or (nil? have-privileges) (nil? token)) (throw (ex-info "Token not found" err/not-auth-user)))
+        (when (not have-privileges) (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
         (doseq [elem filtered-map]
-          (domain/add-manga-page (:tempfile (get params elem)) uuid))
+          (infra/save-photo (:tempfile (get params elem)) uuid))
+        {:status 200 :body "OK"})
+
+      (and (= method :delete) (= uri "/manga"))
+      (let [have-privileges (infa/check-privileges token)
+            params (:query-params req)
+            manga-id (get params "manga_id")
+            page-id (get params "page_id")]
+        (when (or (nil? have-privileges) (nil? token)) (throw (ex-info "Token not found" err/not-auth-user)))
+        (when (not have-privileges) (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
+        (infra/delete-photo manga-id page-id)
         {:status 200 :body "OK"})
 
       :else
