@@ -71,7 +71,7 @@
         {:status 200 :body file})
 
       (and (= method :post) (= uri "/manga"))
-      (let [have-privileges (infa/check-privileges token)
+      (let [have-privileges (infra/check-privileges token)
             params (:multipart-params req)
             filtered-map (filter is-int (keys params))
             uuid (try (java.util.UUID/fromString (get params "id"))
@@ -83,7 +83,7 @@
         {:status 200 :body "OK"})
 
       (and (= method :delete) (= uri "/manga"))
-      (let [have-privileges (infa/check-privileges token)
+      (let [have-privileges (infra/check-privileges token)
             params (:query-params req)
             manga-id (get params "manga_id")
             page-id (get params "page_id")]
