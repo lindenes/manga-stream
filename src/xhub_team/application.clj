@@ -85,11 +85,10 @@
       (and (= method :delete) (= uri "/manga"))
       (let [have-privileges (infra/check-privileges token)
             params (:query-params req)
-            manga-id (get params "manga_id")
-            page-id (get params "page_id")]
+            manga-id (get params "manga_id")]
         (when (or (nil? have-privileges) (nil? token)) (throw (ex-info "Token not found" err/not-auth-user)))
         (when (not have-privileges) (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
-        (infra/delete-photo manga-id page-id)
+        (infra/delete-photos manga-id)
         {:status 200 :body "OK"})
 
       :else

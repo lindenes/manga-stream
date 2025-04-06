@@ -54,9 +54,24 @@
      (:object-content s3-photo))
     (catch Exception ex (throw (ex-info (.getMessage ex) err/photo-not-found)))))
 
-(defn delete-photo [manga-id photo-id]
-  (try
-    (s3/delete-object conf/aws-creds
-                    :bucket-name "hentai-page-bucket"
-                    :key (str manga-id ":" photo-id))
-    (catch Exception ex (throw (ex-info (.getMessage ex) err/photo-not-found)))))
+(defn manga->pages [manga-id]
+  (with-open [conn (jdbc/get-connection datasource)
+              stmt (jdbc/prepare conn ["select id from manga_page where manga_id = ?" (java.util.UUID/fromString manga-id)])]
+    (mapv
+     (fn [x] (.toString (:manga_page/id x)))
+     (jdbc/execute! stmt))))
+
+(defn s3-delete-photos [manga-id]
+  (let [page-ids (manga->pages manga-id)]
+    (when (seq page-ids) (s3/delete-objects conf/aws-creds
+                       {:bucket-name "hentai-page-bucket"
+                        :delete {:objects (map (fn [x] (str manga-id ":" x))  page-ids) }}))))
+
+(defn database-delete-photos [manga-id]
+  (with-open [conn (jdbc/get-connection datasource)
+              stmt (jdbc/prepare conn ["delete from manga_page where manga_id = ?" (java.util.UUID/fromString manga-id)])]
+    (jdbc/execute! stmt)))
+
+(defn delete-photos [manga-id]
+    (s3-delete-photos manga-id)
+    (database-delete-photos manga-id))
