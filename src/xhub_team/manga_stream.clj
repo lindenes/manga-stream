@@ -21,6 +21,7 @@
                             wrap-cors
                             wrap-rest-error)
                         (conf/config :application))
+  (System/setProperty "com.amazonaws.sdk.disableEc2Metadata" "true")
   (println "server started witg port" (conf/config :application)))
 
 (my-server)
