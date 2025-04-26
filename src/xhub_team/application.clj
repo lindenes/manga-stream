@@ -71,27 +71,25 @@
         {:status 200 :body file})
 
       (and (= method :post) (= uri "/manga"))
-      (let [have-privileges (infra/check-privileges token)
-            params (:multipart-params req)
-            filtered-map (filter is-int (keys params))
-            uuid (try (java.util.UUID/fromString (get params "id"))
-                 (catch Exception e (throw (ex-info (.getMessage e) err/validate-error ))))]
+      (let [ params (:multipart-params req)
+            id (try (java.util.UUID/fromString (get params "id"))
+                 (catch Exception e (throw (ex-info (.getMessage e) err/validate-error ))))
+            have-privileges (infra/check-privileges token id)
+            filtered-map (filter is-int (keys params))]
         (when (or (nil? have-privileges) (nil? token)) (throw (ex-info "Token not found" err/not-auth-user)))
         (when (not have-privileges) (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
-        (doseq [elem filtered-map]
-          (infra/save-photo (:tempfile (get params elem)) uuid))
+                (doseq [elem filtered-map]
+          (infra/save-photo (:tempfile (get params elem)) id))
         {:status 200 :body "OK"})
 
       (and (= method :delete) (= uri "/manga"))
-      (let [have-privileges (infra/check-privileges token)
-            params (:query-params req)
-            manga-id (get params "manga_id")]
+      (let [params (:query-params req)
+            manga-id (get params "manga_id")
+            have-privileges (infra/check-privileges token manga-id)]
         (when (or (nil? have-privileges) (nil? token)) (throw (ex-info "Token not found" err/not-auth-user)))
         (when (not have-privileges) (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
         (infra/delete-photos manga-id)
         {:status 200 :body "OK"})
 
       :else
-      {:status 404 :body "Not Found"})
-    )
-  )
+      {:status 404 :body "Not Found"})))

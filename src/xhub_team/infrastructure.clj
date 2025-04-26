@@ -31,9 +31,12 @@
 (def     my-wcar-opts {:pool my-conn-pool, :spec my-conn-spec})
 (defmacro wcar* [& body] `(car/wcar my-wcar-opts ~@body))
 
-(defn check-privileges [token]
-  (let [user (wcar* (car/get token))]
-    (or (:is_admin user)(:is_author user))))
+(defn check-privileges [token manga-id]
+  (let [user (wcar* (car/get token))
+        author-id (with-open [conn (jdbc/get-connection datasource)
+                               stmt (jdbc/prepare conn ["select author_id from manga where id = ?" (java.util.UUID/fromString manga-id)])]
+                    (jdbc/execute! stmt))]
+    (= (:id user) (:manga/author_id author-id))))
 
 (defn save-photo [file manga-id]
   (let [photo-id (java.util.UUID/randomUUID)]
