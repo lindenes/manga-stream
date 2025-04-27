@@ -32,12 +32,17 @@
 (defmacro wcar* [& body] `(car/wcar my-wcar-opts ~@body))
 
 (defn check-privileges [token manga-id]
-  (let [user (wcar* (car/get token))
-        author-id (with-open [conn (jdbc/get-connection datasource)
-                              stmt (jdbc/prepare conn ["select author_id from manga where id = ?" (java.util.UUID/fromString manga-id)])]
-                    (jdbc/execute! stmt))]
+  (let [manga-id->uuid (try (java.util.UUID/fromString manga-id)
+                            (catch Exception e (throw (ex-info (.getMessage e) err/uuid_parse_error))))
+        user (wcar* (car/get token))
+        author-id (-> (with-open [conn (jdbc/get-connection datasource)
+                                  stmt (jdbc/prepare conn ["select author_id from manga where id = ?" manga-id->uuid])]
+                        (jdbc/execute! stmt))
+                      first
+                      :manga/author_id
+                      .toString)]
     (when (nil? user) (throw (ex-info "not found user in storage" err/not-auth-user)))
-    (= (:id user) (:manga/author_id author-id))))
+    (= (:id user) author-id)))
 
 (defn save-photo [file manga-id]
   (let [photo-id (java.util.UUID/randomUUID)]
@@ -47,7 +52,7 @@
                      :key (str manga-id ":" photo-id)
                      :file file)
       (jdbc/with-transaction [tx datasource]
-        (sql/insert! tx :manga_page {:id photo-id :manga_id manga-id}))
+        (sql/insert! tx :manga_page {:id photo-id :manga_id (java.util.UUID/fromString manga-id)}))
       (catch Exception e (throw (ex-info (.getMessage e) err/photo-load-error))))))
 
 (defn read-photo [manga-id photo-id]

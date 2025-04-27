@@ -9,7 +9,7 @@
 (defn error->response [error]
   (let [data (ex-data error)
         error-data (:error-data data)]
-    (log/error data)
+    (log/error error)
     (let [error-map  (condp = (:error_code (first error-data))
                        1
                        {:status 400 :body error-data}
@@ -25,6 +25,9 @@
 
                        5
                        {:status 403 :body error-data}
+
+                       6
+                       {:status 404 :body (:error-data err/validate-error)}
 
                        {:status 500 :body "Unexpected server error"})]
       (-> error-map
@@ -72,12 +75,11 @@
 
       (and (= method :post) (= uri "/manga"))
       (let [params (:multipart-params req)
-            id (try (java.util.UUID/fromString (get params "id"))
-                    (catch Exception e (throw (ex-info (.getMessage e) err/validate-error))))
+            id (get params "id")
             have-privileges (infra/check-privileges token id)
             filtered-map (filter is-int (keys params))]
-        (when (or (nil? have-privileges) (nil? token)) (throw (ex-info "Token not found" err/not-auth-user)))
-        (when (not have-privileges) (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
+        (when (nil? token) (throw (ex-info "Token not found" err/not-auth-user)))
+        (when-not have-privileges (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
         (doseq [elem filtered-map]
           (infra/save-photo (:tempfile (get params elem)) id))
         {:status 200 :body "OK"})
@@ -86,8 +88,8 @@
       (let [params (:query-params req)
             manga-id (get params "manga_id")
             have-privileges (infra/check-privileges token manga-id)]
-        (when (or (not have-privileges) (nil? token)) (throw (ex-info "Token not found" err/not-auth-user)))
-        (when (not have-privileges) (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
+        (when (nil? token) (throw (ex-info "Token not found" err/not-auth-user)))
+        (when-not have-privileges (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
         (infra/delete-photos manga-id)
         {:status 200 :body "OK"})
 

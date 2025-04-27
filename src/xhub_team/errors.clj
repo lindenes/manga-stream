@@ -14,3 +14,6 @@
 
 (def load-delete-permission-error
   {:error-data (list {:error_code 5 :error_message "Для загрузки изображений нужно быть автором или администратором"})})
+
+(def uuid_parse_error
+  {:error-data (list {:error_code 6 :error_message "Не удалось обработать id"})})
