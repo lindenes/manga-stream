@@ -34,27 +34,28 @@
 (defn check-privileges [token manga-id]
   (let [user (wcar* (car/get token))
         author-id (with-open [conn (jdbc/get-connection datasource)
-                               stmt (jdbc/prepare conn ["select author_id from manga where id = ?" (java.util.UUID/fromString manga-id)])]
+                              stmt (jdbc/prepare conn ["select author_id from manga where id = ?" (java.util.UUID/fromString manga-id)])]
                     (jdbc/execute! stmt))]
+    (when (nil? user) (throw (ex-info "not found user in storage" err/not-auth-user)))
     (= (:id user) (:manga/author_id author-id))))
 
 (defn save-photo [file manga-id]
   (let [photo-id (java.util.UUID/randomUUID)]
-     (try
-       (s3/put-object conf/aws-creds
-               :bucket-name "hentai-page-bucket"
-               :key (str manga-id ":" photo-id)
-               :file file )
-    (jdbc/with-transaction [tx datasource]
-      (sql/insert! tx :manga_page {:id photo-id :manga_id manga-id}))
-    (catch Exception e (throw (ex-info (.getMessage e) err/photo-load-error))))))
+    (try
+      (s3/put-object conf/aws-creds
+                     :bucket-name "hentai-page-bucket"
+                     :key (str manga-id ":" photo-id)
+                     :file file)
+      (jdbc/with-transaction [tx datasource]
+        (sql/insert! tx :manga_page {:id photo-id :manga_id manga-id}))
+      (catch Exception e (throw (ex-info (.getMessage e) err/photo-load-error))))))
 
 (defn read-photo [manga-id photo-id]
   (try
     (let [s3-photo  (s3/get-object conf/aws-creds
-                                 :bucket-name "hentai-page-bucket"
-                                 :key (str manga-id ":" photo-id))]
-     (:object-content s3-photo))
+                                   :bucket-name "hentai-page-bucket"
+                                   :key (str manga-id ":" photo-id))]
+      (:object-content s3-photo))
     (catch Exception ex (throw (ex-info (.getMessage ex) err/photo-not-found)))))
 
 (defn manga->pages [manga-id]
@@ -67,8 +68,8 @@
 (defn s3-delete-photos [manga-id]
   (let [page-ids (manga->pages manga-id)]
     (when (seq page-ids) (s3/delete-objects conf/aws-creds
-                       {:bucket-name "hentai-page-bucket"
-                        :delete {:objects (map (fn [x] (str manga-id ":" x))  page-ids) }}))))
+                                            {:bucket-name "hentai-page-bucket"
+                                             :delete {:objects (map (fn [x] (str manga-id ":" x))  page-ids)}}))))
 
 (defn database-delete-photos [manga-id]
   (with-open [conn (jdbc/get-connection datasource)
@@ -76,5 +77,5 @@
     (jdbc/execute! stmt)))
 
 (defn delete-photos [manga-id]
-    (s3-delete-photos manga-id)
-    (database-delete-photos manga-id))
+  (s3-delete-photos manga-id)
+  (database-delete-photos manga-id))
