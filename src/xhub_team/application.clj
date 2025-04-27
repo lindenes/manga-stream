@@ -1,7 +1,7 @@
 (ns xhub-team.application
   (:require [clojure.tools.logging :as log]
-             [xhub-team.errors :as err]
-              [clojure.data.json :as json]
+            [xhub-team.errors :as err]
+            [clojure.data.json :as json]
             [xhub-team.infrastructure :as infra])
   (:use xhub-team.logger)
   (:import (java.io File FileInputStream)))
@@ -11,25 +11,25 @@
         error-data (:error-data data)]
     (log/error data)
     (let [error-map  (condp = (:error_code (first error-data))
-                        1
-                        {:status 400 :body error-data }
+                       1
+                       {:status 400 :body error-data}
 
-                        2
-                        {:status 503 :body error-data}
+                       2
+                       {:status 503 :body error-data}
 
-                        3
-                        {:status 404 :body error-data}
+                       3
+                       {:status 404 :body error-data}
 
-                        4
-                        {:status 401 :body error-data}
+                       4
+                       {:status 401 :body error-data}
 
-                        5
-                        {:status 403 :body error-data}
+                       5
+                       {:status 403 :body error-data}
 
-                        {:status 500 :body "Unexpected server error"}) ]
-         (-> error-map
-             (assoc :body (json/write-str (:body error-map)))
-             (assoc-in [:headers "Content-Type"] "application/json")))))
+                       {:status 500 :body "Unexpected server error"})]
+      (-> error-map
+          (assoc :body (json/write-str (:body error-map)))
+          (assoc-in [:headers "Content-Type"] "application/json")))))
 
 (defn wrap-rest-error [handler]
   (fn [req]
@@ -44,7 +44,7 @@
        :headers {"Access-Control-Allow-Origin" "*"
                  "Access-Control-Allow-Methods" "*"
                  "Access-Control-Allow-Headers" "*"}}
-     (let [response (handler req)]
+      (let [response (handler req)]
         (-> response
             (assoc-in [:headers "Access-Control-Allow-Origin"] "*")
             (assoc-in [:headers "Access-Control-Allow-Methods"] "GET, POST, PUT, DELETE, OPTIONS")
@@ -56,7 +56,7 @@
     (catch Exception _ false)))
 
 (defn handler [req]
-  (log/info "Request:" (:uri req) (:request-method req) )
+  (log/info "Request:" (:uri req) (:request-method req))
   (log/info (:multipart-params req))
   (let [uri (:uri req)
         token (-> req :headers (get "token"))
@@ -71,14 +71,14 @@
         {:status 200 :body file})
 
       (and (= method :post) (= uri "/manga"))
-      (let [ params (:multipart-params req)
+      (let [params (:multipart-params req)
             id (try (java.util.UUID/fromString (get params "id"))
-                 (catch Exception e (throw (ex-info (.getMessage e) err/validate-error ))))
+                    (catch Exception e (throw (ex-info (.getMessage e) err/validate-error))))
             have-privileges (infra/check-privileges token id)
             filtered-map (filter is-int (keys params))]
         (when (or (nil? have-privileges) (nil? token)) (throw (ex-info "Token not found" err/not-auth-user)))
         (when (not have-privileges) (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
-                (doseq [elem filtered-map]
+        (doseq [elem filtered-map]
           (infra/save-photo (:tempfile (get params elem)) id))
         {:status 200 :body "OK"})
 
@@ -86,7 +86,7 @@
       (let [params (:query-params req)
             manga-id (get params "manga_id")
             have-privileges (infra/check-privileges token manga-id)]
-        (when (or (nil? have-privileges) (nil? token)) (throw (ex-info "Token not found" err/not-auth-user)))
+        (when (or (not have-privileges) (nil? token)) (throw (ex-info "Token not found" err/not-auth-user)))
         (when (not have-privileges) (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
         (infra/delete-photos manga-id)
         {:status 200 :body "OK"})
