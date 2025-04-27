@@ -77,7 +77,7 @@
       (let [params (:multipart-params req)
             id (get params "id")
             have-privileges (infra/check-privileges token id)
-            filtered-map (filter is-int (keys params))]
+            filtered-map (sort (filter is-int (keys params)))]
         (when (nil? token) (throw (ex-info "Token not found" err/not-auth-user)))
         (when-not have-privileges (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
         (doseq [elem filtered-map]
