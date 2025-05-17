@@ -78,9 +78,6 @@
             id (get params "id")
             have-privileges (infra/check-privileges token id)
             filtered-map (sort-by #(Integer/parseInt %) (filter is-int (keys params)))]
-        (println params)
-        (println "-------------------------------------")
-        (println filtered-map)
         (when (nil? token) (throw (ex-info "Token not found" err/not-auth-user)))
         (when-not have-privileges (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
         (doseq [elem filtered-map]
@@ -90,10 +87,11 @@
       (and (= method :delete) (= uri "/manga"))
       (let [params (:query-params req)
             manga-id (get params "manga_id")
+            with-manga (get params "with_manga")
             have-privileges (infra/check-privileges token manga-id)]
         (when (nil? token) (throw (ex-info "Token not found" err/not-auth-user)))
         (when-not have-privileges (throw (ex-info "User hase not priveleges" err/load-delete-permission-error)))
-        (infra/delete-photos manga-id)
+        (infra/delete-photos manga-id with-manga)
         {:status 200 :body "OK"})
 
       :else

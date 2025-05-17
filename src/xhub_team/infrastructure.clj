@@ -74,13 +74,17 @@
   (let [page-ids (manga->pages manga-id)]
     (when (seq page-ids) (s3/delete-objects conf/aws-creds
                                             {:bucket-name "hentai-page-bucket"
-                                             :delete {:objects (map (fn [x] (str manga-id ":" x))  page-ids)}}))))
+                                             :keys (mapv (fn [x] (str manga-id ":" x))  page-ids)}))))
 
-(defn database-delete-photos [manga-id]
-  (with-open [conn (jdbc/get-connection datasource)
-              stmt (jdbc/prepare conn ["delete from manga_page where manga_id = ?" (java.util.UUID/fromString manga-id)])]
-    (jdbc/execute! stmt)))
+(defn database-delete-photos [manga-id with-manga]
+  (with-open [conn (jdbc/get-connection datasource)]
+    (let [uuid (java.util.UUID/fromString manga-id)
+          sql-query (if (or (true? with-manga) (= "true" with-manga))
+                      ["DELETE FROM manga WHERE id = ?" uuid]
+                      ["DELETE FROM manga_page WHERE manga_id = ?" uuid])]
+      (with-open [stmt (jdbc/prepare conn sql-query)]
+        (jdbc/execute! stmt)))))
 
-(defn delete-photos [manga-id]
+(defn delete-photos [manga-id with-manga]
   (s3-delete-photos manga-id)
-  (database-delete-photos manga-id))
+  (database-delete-photos manga-id with-manga))
